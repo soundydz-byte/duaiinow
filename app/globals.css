@@ -1,0 +1,257 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 160 84% 39%;
+    --muted: 0 0% 90%;
+    --muted-foreground: 0 0% 42%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 90%;
+    --input: 0 0% 95%;
+    --ring: 160 84% 39%;
+    --chart-1: 160 84% 39%;
+    --chart-2: 160 87% 35%;
+    --chart-3: 160 81% 54%;
+    --chart-4: 160 84% 65%;
+    --chart-5: 160 76% 75%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 217 33% 6%;
+    --foreground: 0 0% 95%;
+    --card: 217 32% 17%;
+    --card-foreground: 0 0% 95%;
+    --popover: 217 32% 17%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 160 84% 39%;
+    --primary-foreground: 217 33% 6%;
+    --secondary: 215 28% 20%;
+    --secondary-foreground: 160 84% 39%;
+    --muted: 215 14% 29%;
+    --muted-foreground: 215 13% 80%;
+    --accent: 160 84% 39%;
+    --accent-foreground: 217 33% 6%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 14% 11%;
+    --border: 215 28% 20%;
+    --input: 217 32% 17%;
+    --ring: 160 84% 39%;
+    --chart-1: 160 84% 39%;
+    --chart-2: 160 87% 35%;
+    --chart-3: 160 81% 54%;
+    --chart-4: 160 84% 65%;
+    --chart-5: 160 76% 75%;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+@layer components {
+  /* Cute background pattern */
+  .cute-bg {
+    background-image: radial-gradient(circle at 20% 50%, oklch(0.55 0.15 165 / 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, oklch(0.65 0.12 180 / 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 40% 20%, oklch(0.45 0.18 150 / 0.02) 0%, transparent 50%);
+  }
+
+  /* Global transitions */
+  * {
+    @apply transition-colors duration-200;
+  }
+
+  /* Animations */
+  @keyframes bounce-slow {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-15px) rotate(5deg);
+    }
+  }
+
+  .animate-bounce-slow {
+    animation: bounce-slow 3s ease-in-out infinite;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  /* Card styles */
+  .cute-card {
+    @apply rounded-2xl border-2 border-emerald-100 shadow-lg transition-all duration-300;
+  }
+
+  .cute-card:hover {
+    @apply scale-105 shadow-xl;
+  }
+
+  /* Text styles */
+  .gradient-text {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .soft-shadow {
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
+  }
+
+  /* Button styles */
+  .cute-button {
+    @apply transition-all duration-300;
+  }
+
+  .cute-button:hover {
+    @apply scale-105;
+  }
+
+  .cute-button:active {
+    @apply scale-95;
+  }
+
+  /* Leaflet map styles */
+  #map {
+    @apply w-full rounded-2xl border-2 border-emerald-100 shadow-lg overflow-hidden;
+    z-index: 1;
+  }
+
+  .leaflet-container {
+    background: linear-gradient(135deg, #f0fdf4 0%, #f5f5f5 100%);
+    font-family: 'Cairo', sans-serif;
+  }
+
+  /* Marker styles */
+  .pharmacy-marker-wrapper {
+    @apply cursor-pointer;
+  }
+
+  .pharmacy-marker {
+    @apply flex flex-col items-center;
+  }
+
+  .marker-icon {
+    @apply w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-lg;
+    background-color: #10b981;
+    border: 3px solid white;
+    @apply transition-all duration-200;
+  }
+
+  .marker-icon.selected {
+    @apply scale-125 ring-4;
+    box-shadow: 0 0 0 4px #d1fae5, 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .marker-label {
+    @apply bg-white text-emerald-900 font-bold text-xs rounded px-2 py-1 shadow-md whitespace-nowrap max-w-xs overflow-hidden text-ellipsis;
+    margin-top: 4px;
+  }
+
+  /* Popup styles */
+  .pharmacy-popup {
+    font-family: 'Cairo', sans-serif;
+  }
+
+  .pharmacy-popup .leaflet-popup-content {
+    @apply bg-white rounded-lg shadow-lg border-0 p-0;
+    margin: 0;
+  }
+
+  .pharmacy-popup .leaflet-popup-content-wrapper {
+    @apply rounded-lg border-2 border-emerald-200 bg-gradient-to-br from-white to-emerald-50;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+  }
+
+  .pharmacy-popup .leaflet-popup-tip {
+    @apply bg-emerald-50 border-2 border-emerald-200;
+  }
+
+  .pharmacy-popup h3 {
+    @apply font-bold text-emerald-900;
+  }
+
+  .pharmacy-popup p {
+    @apply text-muted-foreground;
+  }
+
+  /* Control styles */
+  .leaflet-control-attribution {
+    @apply text-xs opacity-60 hover:opacity-100 transition-opacity rounded-lg;
+    background-color: rgba(255, 255, 255, 0.8) !important;
+  }
+
+  .leaflet-control {
+    @apply rounded-lg;
+  }
+
+  .leaflet-top,
+  .leaflet-bottom {
+    z-index: 2;
+  }
+
+  /* Pane ordering */
+  .leaflet-pane {
+    z-index: auto;
+  }
+
+  .leaflet-tile-pane {
+    z-index: 2;
+  }
+
+  .leaflet-overlay-pane {
+    z-index: 7;
+  }
+
+  .leaflet-shadow-pane {
+    z-index: 5;
+  }
+
+  .leaflet-marker-pane {
+    z-index: 6;
+  }
+
+  .leaflet-popup-pane {
+    z-index: 8;
+  }
+
+  .leaflet-tooltip-pane {
+    z-index: 9;
+  }
+}
