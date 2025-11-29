@@ -48,7 +48,7 @@ export default async function AdminSettingsPage() {
 
             <div className="p-3 bg-muted/50 rounded-lg">
               <p className="text-sm font-medium text-muted-foreground">البريد الإلكتروني</p>
-              <p className="font-semibold">{user.email}</p>
+              <p className="font-semibold">{user?.email || "غير محدد"}</p>
             </div>
 
             <div className="p-3 bg-muted/50 rounded-lg">

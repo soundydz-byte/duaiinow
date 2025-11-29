@@ -279,14 +279,22 @@ export function PrescriptionDetailClient({ prescriptionId }: PrescriptionDetailC
 
                     <Button
                       onClick={async () => {
+                        if (!response.pharmacy?.id) {
+                          toast({
+                            title: "خطأ",
+                            description: "معلومات الصيدلية غير متوفرة",
+                            variant: "destructive",
+                          })
+                          return
+                        }
                         try {
                           const { toggleFavorite } = await import("@/app/actions/favorites")
-                          const result = await toggleFavorite(response.pharmacy?.id)
+                          const result = await toggleFavorite(response.pharmacy.id)
                           toast({
                             title: result.favorited ? "تمت الإضافة للمفضلة" : "تمت الإزالة من المفضلة",
                             description: result.favorited
-                              ? `تم إضافة ${response.pharmacy?.pharmacy_name} للمفضلة`
-                              : `تم إزالة ${response.pharmacy?.pharmacy_name} من المفضلة`,
+                              ? `تم إضافة ${response.pharmacy.pharmacy_name} للمفضلة`
+                              : `تم إزالة ${response.pharmacy.pharmacy_name} من المفضلة`,
                           })
                         } catch (error) {
                           toast({

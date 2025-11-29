@@ -21,7 +21,7 @@ interface Prescription {
 }
 
 export default function PrescriptionsPage() {
-  const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
+  const [prescriptions, setPrescriptions] = useState<(Prescription & { responses_count?: number })[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 

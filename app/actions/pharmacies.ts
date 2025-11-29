@@ -130,7 +130,7 @@ export async function fetchPharmaciesWithLocation(userLatitude: number, userLong
         latitude: pharmacy.latitude,
         longitude: pharmacy.longitude,
         rating: 4.5,
-        status: "مفتوح",
+        status: "مفتوح" as "مفتوح" | "مغلق",
         is_verified: pharmacy.is_verified,
         distance: Number.parseFloat(distance.toFixed(1)),
       }
