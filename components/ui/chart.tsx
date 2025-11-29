@@ -50,11 +50,23 @@ export function ChartContainer({
 
 /* ----------------------- Tooltip ----------------------- */
 
+interface ChartTooltipProps {
+  active?: boolean
+  payload?: Array<{
+    color: string
+    dataKey: string
+    name: string
+    value: any
+    payload: any
+  }>
+  label?: string
+}
+
 export function ChartTooltipContent({
   active,
   payload,
   label,
-}: TooltipProps<any, any>) {
+}: ChartTooltipProps) {
   const { config } = useChart()
 
   if (!active || !payload?.length) return null
@@ -77,7 +89,16 @@ export function ChartTooltipContent({
 
 /* ----------------------- Legend ----------------------- */
 
-export function ChartLegendContent({ payload }: LegendProps) {
+interface ChartLegendProps {
+  payload?: Array<{
+    value: string
+    type: string
+    color: string
+    dataKey?: string
+  }>
+}
+
+export function ChartLegendContent({ payload }: ChartLegendProps) {
   const { config } = useChart()
   if (!payload) return null
 
