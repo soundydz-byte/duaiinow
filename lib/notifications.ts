@@ -9,6 +9,11 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY!
 )
 
+export interface NotificationAction {
+  action: string
+  title: string
+}
+
 export interface NotificationPayload {
   title: string
   body: string
@@ -87,7 +92,7 @@ export async function sendPushNotification(
       } catch (error) {
         console.error('Error sending push notification:', error)
         // Remove invalid tokens
-        if (error.statusCode === 410 || error.statusCode === 400) {
+        if ((error as any).statusCode === 410 || (error as any).statusCode === 400) {
           await supabase
             .from('push_tokens')
             .delete()
