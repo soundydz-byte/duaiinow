@@ -10,18 +10,12 @@ import { Upload, FileText, Sparkles } from 'lucide-react'
 import { UploadCharacter } from "@/components/illustrations/upload-character"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Prescription } from "@/lib/types"
 
-interface Prescription {
-  id: string
-  images_urls: string[]
-  notes?: string
-  created_at: string
-  status: string
-  responses_count: number
-}
+type PrescriptionWithCount = Prescription & { responses_count?: number }
 
 export default function PrescriptionsPage() {
-  const [prescriptions, setPrescriptions] = useState<(Prescription & { responses_count?: number })[]>([])
+  const [prescriptions, setPrescriptions] = useState<PrescriptionWithCount[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
