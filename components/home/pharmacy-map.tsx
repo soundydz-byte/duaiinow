@@ -36,6 +36,15 @@ interface Pharmacy {
 
 export function PharmacyMap({ pharmacies: initialPharmacies }: { pharmacies: Pharmacy[] }) {
   console.log("🔷 PharmacyMap received initialPharmacies:", initialPharmacies)
+  console.log("📊 PharmacyMap data details:", initialPharmacies.map(p => ({
+    name: p.name,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    status: p.status,
+    distance: p.distance,
+    coordinatesValid: isFinite(p.latitude) && isFinite(p.longitude)
+  })))
+  
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>(initialPharmacies || [])
   const [filteredPharmacies, setFilteredPharmacies] = useState<Pharmacy[]>(pharmacies)
   const [searchQuery, setSearchQuery] = useState("")
@@ -210,7 +219,7 @@ export function PharmacyMap({ pharmacies: initialPharmacies }: { pharmacies: Pha
                       {pharmacy.distance && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg">
                           <Navigation className="h-3 w-3" />
-                          {pharmacy.distance} كم
+                          {pharmacy.distance.toFixed(2)} كم
                         </span>
                       )}
                       <span className="text-xs font-semibold text-amber-600 flex items-center gap-0.5 bg-amber-50 px-2 py-1 rounded-lg">

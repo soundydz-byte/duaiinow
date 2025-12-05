@@ -74,13 +74,11 @@ WHERE p.role = 'pharmacy' AND NOT EXISTS (
 LIMIT 5;
 
 -- إضافة اشتراكات نشطة
-INSERT INTO public.subscriptions (pharmacy_id, plan_type, price, status, start_date, end_date)
+INSERT INTO public.subscriptions (pharmacy_id, plan_type, status, expires_at)
 SELECT 
   id,
   'monthly',
-  500.00,
   'active',
-  now() - interval '10 days',
   now() + interval '20 days'
 FROM public.pharmacy_profiles
 ON CONFLICT DO NOTHING;

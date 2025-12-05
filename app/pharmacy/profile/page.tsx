@@ -40,16 +40,34 @@ export default function PharmacyProfilePage() {
       setEmail(user.email || "")
 
       const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-      const { data: pharmacyData } = await supabase.from("pharmacy_profiles").select("*").eq("id", user.id).single()
+      let { data: pharmacyData } = await supabase.from("pharmacy_profiles").select("*").eq("id", user.id).single()
 
       if (profileData) setProfile(profileData)
+
+      // If pharmacy profile doesn't exist and user is pharmacy, create it
+      if (!pharmacyData && profileData?.role === 'pharmacy') {
+        const { data: newPharmacyData, error } = await supabase
+          .from("pharmacy_profiles")
+          .insert({
+            id: user.id,
+            pharmacy_name: profileData.full_name || "",
+            is_verified: false
+          })
+          .select()
+          .single()
+
+        if (!error && newPharmacyData) {
+          pharmacyData = newPharmacyData
+        }
+      }
+
       if (pharmacyData) {
         setPharmacyProfile(pharmacyData)
         setEditedData({
           pharmacy_name: pharmacyData.pharmacy_name || "",
           license_number: pharmacyData.license_number || "",
           address: pharmacyData.address || "",
-          phone: profileData.phone || "",
+          phone: profileData?.phone || "",
           google_maps_url: pharmacyData.google_maps_url || "",
         })
         setHasLocation(!!(pharmacyData.latitude && pharmacyData.longitude))
@@ -72,11 +90,11 @@ export default function PharmacyProfilePage() {
 
           const { error } = await supabase
             .from("pharmacy_profiles")
-            .update({
+            .upsert({
+              id: user.id,
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
             })
-            .eq("id", user.id)
 
           if (!error) {
             setHasLocation(true)
@@ -100,28 +118,46 @@ export default function PharmacyProfilePage() {
   const handleSave = async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (!user) return
 
-    await supabase
+    const { error: pharmacyError } = await supabase
       .from("pharmacy_profiles")
-      .update({
+      .upsert({
+        id: user.id,
         pharmacy_name: editedData.pharmacy_name,
         license_number: editedData.license_number,
         address: editedData.address,
         google_maps_url: editedData.google_maps_url,
       })
-      .eq("id", user.id)
 
-    await supabase
+    if (pharmacyError) {
+      toast({
+        title: "خطأ",
+        description: "فشل في حفظ بيانات الصيدلية",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const { error: profileError } = await supabase
       .from("profiles")
       .update({ phone: editedData.phone })
       .eq("id", user.id)
 
+    if (profileError) {
+      toast({
+        title: "خطأ",
+        description: "فشل في حفظ رقم الهاتف",
+        variant: "destructive",
+      })
+      return
+    }
+
     setPharmacyProfile({ ...pharmacyProfile, ...editedData })
     setProfile({ ...profile, phone: editedData.phone })
     setIsEditing(false)
-    
+
     toast({
       title: "تم الحفظ",
       description: "تم تحديث معلومات الصيدلية بنجاح",

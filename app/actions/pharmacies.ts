@@ -1,62 +1,43 @@
-"use server"
 
-import { createClient } from "@/lib/supabase/server"
-
-// Function to fetch driving distance from OSRM
-async function fetchDrivingDistance(start: [number, number], end: [number, number]): Promise<number | null> {
-  try {
-    // OSRM expects: longitude,latitude
-    const response = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=false`
-    )
-
-    if (!response.ok) {
-      throw new Error(`OSRM API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    if (data.routes && data.routes.length > 0) {
-      const route = data.routes[0]
-      // Distance in meters, convert to kilometers
-      const distanceKm = route.distance / 1000
-      console.log(`OSRM Distance: ${distanceKm.toFixed(2)} km (raw: ${route.distance}m)`)
-      return distanceKm
-    }
-
-    return null
-  } catch (error) {
-    console.error("Error fetching driving distance from OSRM:", error)
-    return null
-  }
-}
-
-// Fallback Haversine distance calculation
-function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371
-  const dLat = (lat2 - lat1) * (Math.PI / 180)
-  const dLon = (lon2 - lon1) * (Math.PI / 180)
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2)
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
-}
+import { createClient } from "@/lib/supabase/server";
+import { fetchDrivingDistance, calculateHaversineDistance } from "@/lib/utils";
 
 export async function fetchPharmaciesWithLocation(userLatitude: number, userLongitude: number) {
   const supabase = await createClient()
 
   try {
-    // First, get all verified pharmacies with coordinates
+    console.log(`\n🔷 [fetchPharmaciesWithLocation] START`)
+    console.log(`📍 User Location: (${userLatitude}, ${userLongitude})`)
+    
+    // Get current user (for authentication)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      console.log(`❌ No user found`)
+      return []
+    }
+
+    // Get all verified pharmacies
     const { data: pharmacies, error } = await supabase
       .from("pharmacy_profiles")
-      .select("id, pharmacy_name, latitude, longitude, address, is_verified")
+      .select(`
+        id,
+        pharmacy_name,
+        latitude,
+        longitude,
+        address,
+        is_verified
+      `)
       .eq("is_verified", true)
       .not("latitude", "is", null)
       .not("longitude", "is", null)
+
+    console.log(`\n📊 [Query Result] ${pharmacies?.length || 0} verified pharmacies found`)
+    if (pharmacies && pharmacies.length > 0) {
+      pharmacies.forEach(p => {
+        const coordsValid = isFinite(p.latitude) && isFinite(p.longitude)
+        console.log(`  • ${p.pharmacy_name}: (${p.latitude}, ${p.longitude}) ${coordsValid ? "✅" : "❌"}`)
+      })
+    }
 
     if (error) {
       console.error("[v0] Error fetching pharmacies:", error)
@@ -64,6 +45,7 @@ export async function fetchPharmaciesWithLocation(userLatitude: number, userLong
     }
 
     if (!pharmacies || pharmacies.length === 0) {
+      console.log(`[DEBUG] No verified pharmacies found`)
       return []
     }
 
@@ -71,58 +53,81 @@ export async function fetchPharmaciesWithLocation(userLatitude: number, userLong
     const pharmaciesWithActiveSubscriptions = []
 
     for (const pharmacy of pharmacies) {
-      const { data: subscriptions } = await supabase
+      const { data: subscriptions, error: subError } = await supabase
         .from("subscriptions")
         .select("*")
         .eq("pharmacy_id", pharmacy.id)
         .eq("status", "active")
 
-      console.log(`Pharmacy ${pharmacy.pharmacy_name}: ${subscriptions?.length || 0} active subscriptions`)
+      console.log(`Pharmacy ${pharmacy.pharmacy_name} (ID: ${pharmacy.id}): ${subscriptions?.length || 0} active subscriptions`)
+      if (subError) console.error(`Subscription query error for pharmacy ${pharmacy.id}:`, subError)
 
       if (subscriptions && subscriptions.length > 0) {
         // Check if any subscription is still valid
         const hasValidSubscription = subscriptions.some(sub => {
-          const endDate = new Date(sub.end_date)
+          const endDate = new Date(sub.expires_at)
           const now = new Date()
-          console.log(`Subscription end: ${endDate.toISOString()}, now: ${now.toISOString()}, valid: ${endDate > now}`)
-          return endDate > now
+          const isValid = endDate > now
+          console.log(`Subscription ID ${sub.id}: expires_at=${endDate.toISOString()}, now=${now.toISOString()}, valid=${isValid}`)
+          return isValid
         })
 
         if (hasValidSubscription) {
           pharmaciesWithActiveSubscriptions.push(pharmacy)
         }
+      } else {
+        console.log(`No active subscriptions found for pharmacy ${pharmacy.pharmacy_name}`)
       }
     }
 
-    console.log(`Found ${pharmaciesWithActiveSubscriptions.length} pharmacies with active subscriptions out of ${pharmacies.length} verified pharmacies`)
+    console.log(`\n🔍 [Processing] Starting distance calculation for ${pharmaciesWithActiveSubscriptions.length} pharmacies`)
 
     // Calculate distances for all pharmacies (with improved OSRM driving distance, fallback to Haversine)
     const pharmaciesWithDistancePromises = pharmaciesWithActiveSubscriptions.map(async (pharmacy: any) => {
-      let distance: number
+      let distance: number = 0
 
-      // Try to get driving distance from OSRM with improved accuracy
-      const drivingDistance = await fetchDrivingDistance(
-        [userLatitude, userLongitude],
-        [pharmacy.latitude, pharmacy.longitude]
-      )
+      console.log(`\n  📱 Processing: ${pharmacy.pharmacy_name}`)
 
-      if (drivingDistance !== null && drivingDistance > 0) {
-        distance = drivingDistance
-        console.log(`✓ Driving distance for ${pharmacy.pharmacy_name}: ${distance.toFixed(1)} km`)
+      // Validate coordinates first
+      if (!isFinite(pharmacy.latitude) || !isFinite(pharmacy.longitude)) {
+        console.warn(`    ❌ Invalid coordinates: (${pharmacy.latitude}, ${pharmacy.longitude})`)
+        distance = 0
       } else {
-        // Fallback to Haversine distance with better precision
-        const haversineDistance = calculateHaversineDistance(
-          userLatitude,
-          userLongitude,
-          pharmacy.latitude,
-          pharmacy.longitude
+        console.log(`    ✅ Coordinates valid: (${pharmacy.latitude}, ${pharmacy.longitude})`)
+        
+        // Try to get driving distance from OSRM with improved accuracy
+        const drivingDistance = await fetchDrivingDistance(
+          [userLatitude, userLongitude],
+          [pharmacy.latitude, pharmacy.longitude]
         )
 
-        // Apply a correction factor for road distance estimation (typically 1.1-1.3x straight line)
-        // This gives a more realistic estimate when routing fails
-        distance = haversineDistance * 1.2
-        console.log(`⚠ Fallback estimated distance for ${pharmacy.pharmacy_name}: ${distance.toFixed(1)} km (Straight line: ${haversineDistance.toFixed(1)} km)`)
+        if (drivingDistance !== null && drivingDistance > 0 && isFinite(drivingDistance)) {
+          distance = drivingDistance
+          console.log(`    ✅ OSRM Result: ${distance.toFixed(2)} km`)
+        } else {
+          // Fallback to Haversine distance with better precision
+          console.log(`    ⚠️ OSRM failed, using Haversine...`)
+          const haversineDistance = calculateHaversineDistance(
+            userLatitude,
+            userLongitude,
+            pharmacy.latitude,
+            pharmacy.longitude
+          )
+
+          if (isFinite(haversineDistance) && haversineDistance > 0) {
+            // Apply a correction factor for road distance estimation (typically 1.1-1.3x straight line)
+            // This gives a more realistic estimate when routing fails
+            distance = haversineDistance * 1.2
+            console.log(`    ✅ Haversine Result: ${haversineDistance.toFixed(2)} km × 1.2 = ${distance.toFixed(2)} km`)
+          } else {
+            distance = 0
+            console.warn(`    ❌ Haversine failed: ${haversineDistance}`)
+          }
+        }
       }
+
+      // Ensure distance is a valid number
+      const finalDistance = isFinite(distance) && distance >= 0 ? Number(distance.toFixed(2)) : 0
 
       return {
         id: pharmacy.id,
@@ -132,21 +137,32 @@ export async function fetchPharmaciesWithLocation(userLatitude: number, userLong
         rating: 4.5,
         status: "مفتوح" as "مفتوح" | "مغلق",
         is_verified: pharmacy.is_verified,
-        distance: Number.parseFloat(distance.toFixed(1)),
+        distance: finalDistance,
       }
     })
 
     const pharmaciesWithDistance = await Promise.all(pharmaciesWithDistancePromises)
 
-    // Filter and sort pharmacies by distance (50 km maximum radius)
-    const filteredPharmacies = pharmaciesWithDistance
-      .filter((p: any) => p.distance <= 50) // 50 كم = الحد الأقصى
-      .sort((a: any, b: any) => a.distance - b.distance)
-    
-    console.log(`✅ Final result: ${filteredPharmacies.length} pharmacies returned (filtered from ${pharmaciesWithDistance.length})`)
-    console.log("🔷 Pharmacies to return:", filteredPharmacies.map(p => ({ name: p.name, distance: p.distance })))
-    
-    return filteredPharmacies
+    // Sort pharmacies by distance (no radius limit since they're in the same state)
+    const sortedPharmacies = pharmaciesWithDistance.sort((a: any, b: any) => a.distance - b.distance)
+
+    console.log(`\n✅ [Result] ${sortedPharmacies.length} pharmacies with distances calculated`)
+    sortedPharmacies.forEach(p => {
+      console.log(`  • ${p.name}: ${p.distance} km`)
+    })
+
+    // Filter out any pharmacies with invalid coordinates (NaN or Infinity)
+    const validPharmacies = sortedPharmacies.filter(p => {
+      const isValid = typeof p.latitude === 'number' && typeof p.longitude === 'number' && 
+                     isFinite(p.latitude) && isFinite(p.longitude)
+      if (!isValid) {
+        console.warn(`⚠️ Filtering out invalid: ${p.name}`)
+      }
+      return isValid
+    })
+
+    console.log(`\n🎯 [Final] ${validPharmacies.length} valid pharmacies returned\n`)
+    return validPharmacies
   } catch (error) {
     console.error("[v0] Error in fetchPharmaciesWithLocation:", error)
     return []

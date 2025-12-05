@@ -21,6 +21,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [phone, setPhone] = useState("")
+  const [state, setState] = useState("")
 
   // Pharmacy specific fields
   const [pharmacyName, setPharmacyName] = useState("")
@@ -89,6 +90,7 @@ export default function SignupPage() {
         full_name: fullName,
         role: role,
         phone: phone,
+        state: state,
       }
 
       if (role === "pharmacy") {

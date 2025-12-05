@@ -109,6 +109,8 @@ export default function InteractiveMap({ pharmacies, selectedPharmacy, onSelectP
       })
         .bindPopup("<div style='text-align: center; font-weight: bold;'>📍 موقعك الحالي</div>")
         .addTo(mapRef.current)
+      
+      console.log("✅ Map initialized at user location:", userLocation)
     }
 
     if (!mapRef.current) return
@@ -120,9 +122,29 @@ export default function InteractiveMap({ pharmacies, selectedPharmacy, onSelectP
     const pharmaciesToShow = pharmacies
 
     console.log("🔷 InteractiveMap received pharmacies:", pharmaciesToShow.length, "pharmacies")
-    console.log("📍 Pharmacy details:", pharmaciesToShow.map(p => ({ name: p.name, lat: p.latitude, lng: p.longitude, distance: p.distance })))
+    console.log("📍 Pharmacy details:", pharmaciesToShow.map(p => ({ 
+      name: p.name, 
+      lat: p.latitude, 
+      lng: p.longitude, 
+      distance: p.distance,
+      status: p.status,
+      validCoords: isFinite(p.latitude) && isFinite(p.longitude)
+    })))
+    
+    if (pharmaciesToShow.length === 0) {
+      console.warn("⚠️ No pharmacies to show on map!")
+    }
 
     pharmaciesToShow.forEach((pharmacy) => {
+      // Validate coordinates before adding marker
+      if (!isFinite(pharmacy.latitude) || !isFinite(pharmacy.longitude)) {
+        console.error(`❌ Invalid coordinates for pharmacy: ${pharmacy.name}`, {
+          latitude: pharmacy.latitude,
+          longitude: pharmacy.longitude
+        })
+        return
+      }
+
       const isSelected = selectedPharmacy?.id === pharmacy.id
       const isOpen = pharmacy.status === "مفتوح"
 
@@ -189,7 +211,7 @@ export default function InteractiveMap({ pharmacies, selectedPharmacy, onSelectP
             ${pharmacy.status}
           </p>
           ${pharmacy.distance ? `<p style="margin: 8px 0; font-size: 14px; color: #374151; font-weight: bold;">
-            📍 ${pharmacy.distance} كم
+            📍 المسافة: ${pharmacy.distance.toFixed(2)} كم
           </p>` : ''}
         </div>
       `)
@@ -266,10 +288,60 @@ export default function InteractiveMap({ pharmacies, selectedPharmacy, onSelectP
       markersRef.current.set(pharmacy.id, marker)
     })
 
+    // User has complete freedom - no zoom changes, no map movement
+    // Only draw the route when pharmacy is selected
+    console.log("📍 Pharmacy markers added. Map is completely free for user.")
+
     if (selectedPharmacy && mapRef.current) {
-      mapRef.current.flyTo([selectedPharmacy.latitude, selectedPharmacy.longitude], 15, {
-        duration: 1.5,
-      })
+      if (routeLayerRef.current) {
+        routeLayerRef.current.remove()
+      }
+
+      // Only draw route, don't move or zoom the map
+      fetchRouteFromOSRM(userLocation, [selectedPharmacy.latitude, selectedPharmacy.longitude])
+        .then((routeCoordinates) => {
+          if (routeCoordinates && routeCoordinates.length > 0) {
+            routeLayerRef.current = L.polyline(routeCoordinates, {
+              color: "#10b981",
+              weight: 6,
+              opacity: 0.8,
+              lineCap: "round"
+            }).addTo(mapRef.current!)
+
+            console.log("✅ Route drawn from user to pharmacy")
+          } else {
+            // Fallback to straight line if OSRM fails
+            console.warn("⚠️ OSRM failed, using straight line")
+            const latlngs: L.LatLngExpression[] = [
+              [userLocation[0], userLocation[1]],
+              [selectedPharmacy.latitude, selectedPharmacy.longitude]
+            ]
+
+            routeLayerRef.current = L.polyline(latlngs, {
+              color: "#10b981",
+              weight: 6,
+              opacity: 0.8,
+              dashArray: "15, 10",
+              lineCap: "round"
+            }).addTo(mapRef.current!)
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching route:", error)
+          // Fallback to straight line
+          const latlngs: L.LatLngExpression[] = [
+            [userLocation[0], userLocation[1]],
+            [selectedPharmacy.latitude, selectedPharmacy.longitude]
+          ]
+
+          routeLayerRef.current = L.polyline(latlngs, {
+            color: "#10b981",
+            weight: 6,
+            opacity: 0.8,
+            dashArray: "15, 10",
+            lineCap: "round"
+          }).addTo(mapRef.current!)
+        })
     }
   }, [pharmacies, selectedPharmacy, onSelectPharmacy, onNavigate, userLocation, currentZoom])
 

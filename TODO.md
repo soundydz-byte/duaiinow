@@ -1,20 +1,34 @@
-# Map Improvements TODO
+# Pharmacy Profile Fix TODO
 
-## 1. Update Distance Calculation (app/actions/pharmacies.ts)
-- [x] Replace Haversine formula with OSRM API for driving distances
-- [x] Add function to fetch driving distance from OSRM
-- [x] Update fetchPharmaciesWithLocation to use driving distances
-- [x] Handle API errors gracefully with fallback to Haversine
+## Issue Description
+Pharmacies logging in see "غير محدد" (not specified) for all profile fields. Editing and saving doesn't persist data. Location setting shows "لم يتم تحديد الموقع" even after updating.
 
-## 2. Implement Dynamic Icon Scaling (components/home/interactive-map.tsx)
-- [x] Add zoom event listener to map
-- [x] Calculate icon size based on zoom level
-- [x] Update pharmacy markers dynamically on zoom change
-- [x] Prevent excessive icon growth at high zoom levels
-- [x] Ensure icons shrink appropriately at low zoom levels
+## Root Cause
+- `pharmacy_profiles` table row not created for existing pharmacy users.
+- No automatic creation of `pharmacy_profiles` on signup for pharmacy role users.
+- Update operations fail on non-existent rows.
 
-## 3. Testing and Optimization
-- [ ] Test distance accuracy with OSRM API
-- [ ] Verify icon scaling behavior across zoom levels
-- [ ] Check performance with multiple pharmacies
-- [ ] Optimize API calls if needed
+## Fixes Applied
+
+### 1. Frontend Fix (app/pharmacy/profile/page.tsx)
+- [x] Modified `useEffect` to create `pharmacy_profiles` row if missing for pharmacy users.
+- [x] Changed `handleSave` to use `upsert` instead of `update` for pharmacy data.
+- [x] Added error handling in `handleSave`.
+
+### 2. Database Trigger Fix (scripts/002_create_profile_trigger.sql)
+- [x] Updated `handle_new_user` function to automatically create `pharmacy_profiles` row for new pharmacy users.
+
+## Remaining Tasks
+
+### 3. Apply Database Changes
+- [ ] Run the updated `scripts/002_create_profile_trigger.sql` in Supabase SQL Editor to update the trigger for future signups.
+
+### 4. Test the Fix
+- [ ] Login as existing pharmacy user.
+- [ ] Verify profile fields show correct data (not "غير محدد").
+- [ ] Edit and save profile information.
+- [ ] Verify data persists after refresh.
+- [ ] Set/update location and verify it shows as set.
+
+### 5. Optional: Migrate Existing Pharmacies
+- [ ] If needed, run a script to create `pharmacy_profiles` for existing pharmacy users without one.

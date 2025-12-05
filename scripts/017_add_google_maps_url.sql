@@ -7,4 +7,11 @@ drop policy if exists "pharmacy_profiles_update_own" on public.pharmacy_profiles
 
 create policy "pharmacy_profiles_update_own"
   on public.pharmacy_profiles for update
-  using (auth.uid() = id);
+  using (
+    auth.uid() = id OR
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.role = 'admin'
+    )
+  );

@@ -1,24 +1,117 @@
-import { createClient } from "@/lib/supabase/server"
+"use client"
+
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Building2, MapPin, FileText, CheckCircle, X, ArrowRight, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { AdminAuthCheck } from "@/components/admin/admin-auth-check"
+import { useToast } from "@/hooks/use-toast"
 
-export default async function AdminPharmaciesPage() {
-  const supabase = await createClient()
+export default function AdminPharmaciesPage() {
+  const [pharmacies, setPharmacies] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
-  // Get all pharmacies with their profiles
-  const { data: pharmacies } = await supabase
-    .from("pharmacy_profiles")
-    .select(
-      `
-      *,
-      profile:profiles(*)
-    `,
-    )
-    .order("created_at", { ascending: false })
+  useEffect(() => {
+    fetchPharmacies()
+  }, [])
+
+  const fetchPharmacies = async () => {
+    const supabase = createClient()
+    const { data: pharmaciesData } = await supabase
+      .from("pharmacy_profiles")
+      .select(
+        `
+        *,
+        profile:profiles(*)
+      `,
+      )
+      .order("created_at", { ascending: false })
+
+    if (pharmaciesData) {
+      setPharmacies(pharmaciesData)
+    }
+    setLoading(false)
+  }
+
+  const approvePharmacy = async (pharmacyId: string) => {
+    const supabase = createClient()
+
+    // First, verify the pharmacy
+    const { error: verifyError } = await supabase
+      .from("pharmacy_profiles")
+      .update({ is_verified: true })
+      .eq("id", pharmacyId)
+
+    if (verifyError) {
+      toast({
+        title: "خطأ",
+        description: "فشل في تفعيل الصيدلية",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Create a default subscription (30 days trial)
+    const { error: subscriptionError } = await supabase
+      .from("subscriptions")
+      .insert({
+        pharmacy_id: pharmacyId,
+        plan_type: "monthly",
+        receipt_url: "trial_subscription", // Dummy receipt for trial
+        status: "active",
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+      })
+
+    if (subscriptionError) {
+      console.error("Subscription creation error:", subscriptionError)
+      toast({
+        title: "تحذير",
+        description: "تم تفعيل الصيدلية لكن فشل في إنشاء الاشتراك التجريبي",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Update local state
+    setPharmacies(prev => prev.map(p =>
+      p.id === pharmacyId ? { ...p, is_verified: true } : p
+    ))
+
+    toast({
+      title: "تم التفعيل",
+      description: "تم تفعيل الصيدلية وإنشاء اشتراك تجريبي لمدة 30 يوم",
+    })
+  }
+
+  const rejectPharmacy = async (pharmacyId: string) => {
+    const supabase = createClient()
+    const { error } = await supabase
+      .from("pharmacy_profiles")
+      .delete()
+      .eq("id", pharmacyId)
+
+    if (error) {
+      toast({
+        title: "خطأ",
+        description: "فشل في رفض الصيدلية",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Remove from local state
+    setPharmacies(prev => prev.filter(p => p.id !== pharmacyId))
+
+    toast({
+      title: "تم الرفض",
+      description: "تم حذف طلب الصيدلية",
+    })
+  }
 
   return (
     <AdminAuthCheck>
@@ -50,7 +143,11 @@ export default async function AdminPharmaciesPage() {
       </header>
 
       <main className="p-6">
-        {pharmacies && pharmacies.length > 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+          </div>
+        ) : pharmacies && pharmacies.length > 0 ? (
           <div className="space-y-4">
             {pharmacies.map((pharmacy: any) => (
               <Card
@@ -112,11 +209,15 @@ export default async function AdminPharmaciesPage() {
 
                   {!pharmacy.is_verified && (
                     <div className="flex gap-3">
-                      <Button className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold shadow-lg cute-button rounded-lg">
+                      <Button
+                        onClick={() => approvePharmacy(pharmacy.id)}
+                        className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-bold shadow-lg cute-button rounded-lg"
+                      >
                         <CheckCircle className="ml-2 h-5 w-5" />
                         تفعيل الآن
                       </Button>
                       <Button
+                        onClick={() => rejectPharmacy(pharmacy.id)}
                         variant="destructive"
                         className="flex-1 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-lg cute-button rounded-lg"
                       >
