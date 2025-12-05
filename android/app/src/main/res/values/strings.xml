@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">duaii</string>
+    <string name="title_activity_main">duaii</string>
+    <string name="package_name">com.duaiii.app</string>
+    <string name="custom_url_scheme">com.duaiii.app</string>
+</resources>

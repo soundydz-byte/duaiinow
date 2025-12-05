@@ -52,6 +52,57 @@ export function PharmacyMap({ pharmacies: initialPharmacies }: { pharmacies: Pha
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState<"الكل" | "مفتوح" | "مغلق">("الكل")
   const [sortBy, setSortBy] = useState<"distance" | "rating">("distance")
+  const [isLoadingRealDistances, setIsLoadingRealDistances] = useState(false)
+
+  // Fetch pharmacies with real user location when component mounts
+  useEffect(() => {
+    const fetchPharmaciesWithRealLocation = async () => {
+      try {
+        setIsLoadingRealDistances(true)
+        
+        // Get user's real location
+        if ("geolocation" in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords
+              console.log(`📍 Got user's real location: (${latitude}, ${longitude})`)
+
+              // Call API to get pharmacies with real distances
+              const response = await fetch("/api/pharmacies", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  userLatitude: latitude,
+                  userLongitude: longitude,
+                }),
+              })
+
+              if (response.ok) {
+                const pharmaciesWithRealDistances = await response.json()
+                console.log("📊 Pharmacies with real distances:", pharmaciesWithRealDistances)
+                setPharmacies(pharmaciesWithRealDistances)
+              } else {
+                console.warn("Failed to fetch pharmacies with real distances, using initial data")
+              }
+            },
+            (error) => {
+              console.warn("Geolocation error, using initial distances:", error)
+            }
+          )
+        } else {
+          console.warn("Geolocation not available, using initial distances")
+        }
+      } catch (error) {
+        console.error("Error fetching pharmacies with real location:", error)
+      } finally {
+        setIsLoadingRealDistances(false)
+      }
+    }
+
+    fetchPharmaciesWithRealLocation()
+  }, [])
 
   // Check for selected pharmacy from sessionStorage (when coming from prescription details) or URL query
   useEffect(() => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from "@/lib/supabase/client"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -193,6 +194,18 @@ export function PrescriptionDetailClient({ prescriptionId }: PrescriptionDetailC
               <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 ml-2">{responses.length}</Badge>
             </h2>
           </div>
+
+          {responses.length === 0 && prescription.status === "pending" && (
+            <Button
+              asChild
+              className="w-full mb-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold h-12 rounded-xl"
+            >
+              <a href={`/prescriptions/select-pharmacies?prescriptionId=${prescriptionId}`}>
+                <MapPin className="ml-2 h-5 w-5" />
+                إرسال الوصفة للصيدليات القريبة
+              </a>
+            </Button>
+          )}
 
           {responses.length > 0 ? (
             <div className="space-y-4">

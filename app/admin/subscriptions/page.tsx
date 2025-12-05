@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,22 +14,23 @@ export default function AdminSubscriptionsPage() {
 
   const fetchSubscriptions = async () => {
     console.log("Starting to fetch subscriptions...")
-    const supabase = createClient()
+    
+    const response = await fetch("/api/admin/subscriptions", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
 
-    const { data: subsData, error: subsError } = await supabase
-      .from("subscriptions")
-      .select("*")
-      .eq("status", "pending")
-      .order("created_at", { ascending: false })
-
-    console.log("Subscriptions data:", subsData)
-    console.log("Subscriptions error:", subsError)
-
-    if (subsError) {
-      console.error("Error fetching subscriptions:", subsError)
+    if (!response.ok) {
+      console.error("Error fetching subscriptions")
       setIsLoading(false)
       return
     }
+
+    const subsData = await response.json()
+
+    console.log("Subscriptions data:", subsData)
 
     if (!subsData || subsData.length === 0) {
       console.log("No pending subscriptions found")
@@ -39,28 +39,8 @@ export default function AdminSubscriptionsPage() {
       return
     }
 
-    const subscriptionsWithPharmacy = await Promise.all(
-      subsData.map(async (sub) => {
-        console.log("Fetching pharmacy for ID:", sub.pharmacy_id)
-
-        const { data: pharmacyData, error: pharmacyError } = await supabase
-          .from("pharmacy_profiles")
-          .select("*")
-          .eq("id", sub.pharmacy_id)
-          .single()
-
-        console.log("Pharmacy data:", pharmacyData)
-        console.log("Pharmacy error:", pharmacyError)
-
-        return {
-          ...sub,
-          pharmacy: pharmacyData
-        }
-      })
-    )
-
-    console.log("Final subscriptions with pharmacy:", subscriptionsWithPharmacy)
-    setSubscriptions(subscriptionsWithPharmacy)
+    console.log("Final subscriptions with pharmacy:", subsData)
+    setSubscriptions(subsData)
     setIsLoading(false)
   }
 
@@ -69,63 +49,21 @@ export default function AdminSubscriptionsPage() {
   }, [])
 
   const handleApprove = async (subscriptionId: string, pharmacyId: string, planType: string) => {
-    const supabase = createClient()
-
     try {
-      const now = new Date()
-      const endDate = new Date(now)
-      if (planType === "monthly") {
-        endDate.setMonth(endDate.getMonth() + 1)
-      } else if (planType === "yearly") {
-        endDate.setFullYear(endDate.getFullYear() + 1)
-      }
-
-      console.log("Approving subscription:", subscriptionId, "for pharmacy:", pharmacyId)
-
-      // First, update the subscription to active
-      const { error: subError } = await supabase
-        .from("subscriptions")
-        .update({
-          status: "active",
-          start_date: now.toISOString(),
-          end_date: endDate.toISOString()
-        })
-        .eq("id", subscriptionId)
-
-      if (subError) {
-        console.error("Subscription update error:", subError)
-        throw subError
-      }
-
-      console.log("Subscription updated successfully")
-
-      // Then, update the pharmacy profile to verified
-      const { error: pharmacyError } = await supabase
-        .from("pharmacy_profiles")
-        .update({ is_verified: true })
-        .eq("id", pharmacyId)
-
-      if (pharmacyError) {
-        console.error("Pharmacy update error:", pharmacyError)
-        throw pharmacyError
-      }
-
-      console.log("Pharmacy verification updated successfully")
-
-      // Create notification for pharmacy
-      await supabase.from("notifications").insert({
-        user_id: pharmacyId,
-        title: "تمت الموافقة على اشتراكك",
-        message: "تم اعتماد اشتراكك بنجاح وأصبحت مرئية على الخريطة",
-        type: "subscription_approved",
-        data: { subscription_id: subscriptionId },
+      const response = await fetch("/api/admin/subscriptions/approve", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ subscriptionId, pharmacyId, planType }),
       })
 
-      // Remove from pending list and refresh
-      setSubscriptions(subscriptions.filter((s) => s.id !== subscriptionId))
+      if (!response.ok) {
+        throw new Error("Failed to approve subscription")
+      }
 
-      // Refresh the list to ensure it's up to date
-      await fetchSubscriptions()
+      // Remove from pending list
+      setSubscriptions(subscriptions.filter((s) => s.id !== subscriptionId))
 
       alert("تم قبول الاشتراك بنجاح! الصيدلية الآن ستظهر على الخريطة للمرضى")
     } catch (error) {
@@ -135,28 +73,20 @@ export default function AdminSubscriptionsPage() {
   }
 
   const handleReject = async (subscriptionId: string) => {
-    const supabase = createClient()
-
     try {
-      console.log("Rejecting subscription:", subscriptionId)
+      const response = await fetch("/api/admin/subscriptions/reject", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ subscriptionId }),
+      })
 
-      const { error } = await supabase
-        .from("subscriptions")
-        .update({ status: "rejected" })
-        .eq("id", subscriptionId)
-
-      if (error) {
-        console.error("Error rejecting subscription:", error)
-        throw error
+      if (!response.ok) {
+        throw new Error("Failed to reject subscription")
       }
 
-      console.log("Subscription rejected successfully")
-
-      // Remove from pending list and refresh
       setSubscriptions(subscriptions.filter((s) => s.id !== subscriptionId))
-
-      // Refresh the list to ensure it's up to date
-      await fetchSubscriptions()
 
       alert("تم رفض الاشتراك")
     } catch (error) {

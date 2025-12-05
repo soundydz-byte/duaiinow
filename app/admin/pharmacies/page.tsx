@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,97 +19,81 @@ export default function AdminPharmaciesPage() {
   }, [])
 
   const fetchPharmacies = async () => {
-    const supabase = createClient()
-    const { data: pharmaciesData } = await supabase
-      .from("pharmacy_profiles")
-      .select(
-        `
-        *,
-        profile:profiles(*)
-      `,
-      )
-      .order("created_at", { ascending: false })
+    const response = await fetch("/api/admin/pharmacies", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
 
-    if (pharmaciesData) {
-      setPharmacies(pharmaciesData)
+    if (response.ok) {
+      const data = await response.json()
+      setPharmacies(data)
     }
+
     setLoading(false)
   }
 
   const approvePharmacy = async (pharmacyId: string) => {
-    const supabase = createClient()
+    try {
+      const response = await fetch("/api/admin/pharmacies/approve", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pharmacyId }),
+      })
 
-    // First, verify the pharmacy
-    const { error: verifyError } = await supabase
-      .from("pharmacy_profiles")
-      .update({ is_verified: true })
-      .eq("id", pharmacyId)
+      if (!response.ok) {
+        throw new Error("Failed to approve pharmacy")
+      }
 
-    if (verifyError) {
+      // Update local state
+      setPharmacies(prev => prev.map(p =>
+        p.id === pharmacyId ? { ...p, is_verified: true } : p
+      ))
+
+      toast({
+        title: "تم التفعيل",
+        description: "تم تفعيل الصيدلية وإنشاء اشتراك تجريبي لمدة 30 يوم",
+      })
+    } catch (error) {
       toast({
         title: "خطأ",
         description: "فشل في تفعيل الصيدلية",
         variant: "destructive",
       })
-      return
     }
-
-    // Create a default subscription (30 days trial)
-    const { error: subscriptionError } = await supabase
-      .from("subscriptions")
-      .insert({
-        pharmacy_id: pharmacyId,
-        plan_type: "monthly",
-        receipt_url: "trial_subscription", // Dummy receipt for trial
-        status: "active",
-        start_date: new Date().toISOString(),
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-      })
-
-    if (subscriptionError) {
-      console.error("Subscription creation error:", subscriptionError)
-      toast({
-        title: "تحذير",
-        description: "تم تفعيل الصيدلية لكن فشل في إنشاء الاشتراك التجريبي",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Update local state
-    setPharmacies(prev => prev.map(p =>
-      p.id === pharmacyId ? { ...p, is_verified: true } : p
-    ))
-
-    toast({
-      title: "تم التفعيل",
-      description: "تم تفعيل الصيدلية وإنشاء اشتراك تجريبي لمدة 30 يوم",
-    })
   }
 
   const rejectPharmacy = async (pharmacyId: string) => {
-    const supabase = createClient()
-    const { error } = await supabase
-      .from("pharmacy_profiles")
-      .delete()
-      .eq("id", pharmacyId)
+    try {
+      const response = await fetch("/api/admin/pharmacies/reject", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pharmacyId }),
+      })
 
-    if (error) {
+      if (!response.ok) {
+        throw new Error("Failed to reject pharmacy")
+      }
+
+      // Remove from local state
+      setPharmacies(prev => prev.filter(p => p.id !== pharmacyId))
+
+      toast({
+        title: "تم الرفض",
+        description: "تم حذف طلب الصيدلية",
+      })
+    } catch (error) {
       toast({
         title: "خطأ",
         description: "فشل في رفض الصيدلية",
         variant: "destructive",
       })
-      return
     }
-
-    // Remove from local state
-    setPharmacies(prev => prev.filter(p => p.id !== pharmacyId))
-
-    toast({
-      title: "تم الرفض",
-      description: "تم حذف طلب الصيدلية",
-    })
   }
 
   return (

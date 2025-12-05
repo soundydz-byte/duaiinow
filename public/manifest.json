@@ -1,0 +1,83 @@
+{
+  "name": "دوائي - Duaiii",
+  "short_name": "دوائي",
+  "description": "تطبيق البحث عن الأدوية والصيدليات القريبة",
+  "start_url": "/home",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#10b981",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/images/logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/logo-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/images/logo-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/screenshot1.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/images/screenshot2.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "رفع وصفة",
+      "short_name": "رفع",
+      "description": "رفع وصفة طبية جديدة",
+      "url": "/upload",
+      "icons": [
+        {
+          "src": "/images/upload-icon.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "البحث عن صيدليات",
+      "short_name": "صيدليات",
+      "description": "البحث عن الصيدليات القريبة",
+      "url": "/home",
+      "icons": [
+        {
+          "src": "/images/pharmacy-icon.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "categories": ["medical", "lifestyle"],
+  "prefer_related_applications": false,
+  "gcm_sender_id": "103953800507",
+  "gcm_user_visible_only": true
+}

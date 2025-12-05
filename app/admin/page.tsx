@@ -6,12 +6,14 @@ import { AdminAuthCheck } from "@/components/admin/admin-auth-check"
 import { useEffect, useState } from "react"
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, Building2, FileText, Settings, TrendingUp, Sparkles, Wrench } from 'lucide-react'
+import { Users, Building2, FileText, Settings, TrendingUp, Sparkles, Wrench, Activity } from 'lucide-react'
 import { fixSubscriptionApproval } from "@/app/actions/admin-fix-subscriptions"
 import { useToast } from "@/hooks/use-toast"
+import { getAnalyticsStats } from "@/hooks/use-analytics"
 import Link from "next/link"
 import Image from "next/image"
 import { AdminLogoutButton } from "@/components/admin/logout-button"
+import { getAdminStats } from "@/app/actions/admin-stats"
 
 export default function AdminDashboardPage() {
   const router = useRouter()
@@ -24,54 +26,35 @@ export default function AdminDashboardPage() {
     prescriptionsCount: 0,
     pendingPharmacies: 0,
   })
+  const [analyticsStats, setAnalyticsStats] = useState({
+    totalEvents: 0,
+    eventsLastWeek: 0,
+    uniqueUsers: 0,
+    eventsByType: [],
+  })
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const { createClient } = await import("@/lib/supabase/client")
-        const supabase = createClient()
+        console.log("🔷 Fetching admin stats from server...")
+        const fetchedStats = await getAdminStats()
+        
+        console.log("📊 Fetched Admin Stats:", fetchedStats)
+        setStats(fetchedStats)
 
-        console.log("Fetching admin stats...")
-
-        const { count: usersCount } = await supabase
-          .from("profiles")
-          .select("*", { count: "exact", head: true })
-          .eq("role", "user")
-
-        const { count: pharmaciesCount } = await supabase
-          .from("profiles")
-          .select("*", { count: "exact", head: true })
-          .eq("role", "pharmacy")
-
-        const { count: prescriptionsCount } = await supabase
-          .from("prescriptions")
-          .select("*", { count: "exact", head: true })
-
-        const { count: pendingSubscriptions, error: subError } = await supabase
-          .from("subscriptions")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "pending")
-
-        console.log("Pending subscriptions count:", pendingSubscriptions)
-        if (subError) {
-          console.error("Subscriptions error:", subError)
-        }
-
-        setStats({
-          usersCount: usersCount || 0,
-          pharmaciesCount: pharmaciesCount || 0,
-          prescriptionsCount: prescriptionsCount || 0,
-          pendingPharmacies: pendingSubscriptions || 0,
-        })
+        // Fetch analytics stats
+        const analytics = await getAnalyticsStats()
+        console.log("📊 Fetched Analytics Stats:", analytics)
+        setAnalyticsStats(analytics)
       } catch (error) {
-        console.error("Error fetching stats:", error)
+        console.error("❌ Error fetching stats:", error)
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchStats()
-  }, [router])
+  }, [])
 
   const handleFixSubscriptions = async () => {
     setIsFixing(true)
@@ -181,6 +164,40 @@ export default function AdminDashboardPage() {
         </header>
 
         <main className="p-6 space-y-8">
+          {/* Analytics Section */}
+          <section>
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-2xl font-bold text-purple-900">التحليلات</h2>
+              <Activity className="h-5 w-5 text-purple-600" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Card className="border-2 border-blue-100 shadow-md">
+                <CardContent className="p-5 text-center">
+                  <p className="text-sm text-gray-600 mb-2">إجمالي الأحداث</p>
+                  <p className="text-3xl font-bold text-blue-600">{analyticsStats.totalEvents}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-2 border-green-100 shadow-md">
+                <CardContent className="p-5 text-center">
+                  <p className="text-sm text-gray-600 mb-2">هذا الأسبوع</p>
+                  <p className="text-3xl font-bold text-green-600">{analyticsStats.eventsLastWeek}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-2 border-orange-100 shadow-md">
+                <CardContent className="p-5 text-center">
+                  <p className="text-sm text-gray-600 mb-2">المستخدمين النشطين</p>
+                  <p className="text-3xl font-bold text-orange-600">{analyticsStats.uniqueUsers}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-2 border-pink-100 shadow-md">
+                <CardContent className="p-5 text-center">
+                  <p className="text-sm text-gray-600 mb-2">أنواع الأحداث</p>
+                  <p className="text-3xl font-bold text-pink-600">{analyticsStats.eventsByType.length}</p>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
           <section>
             <div className="flex items-center gap-2 mb-4">
               <h2 className="text-2xl font-bold text-purple-900">الإدارة السريعة</h2>

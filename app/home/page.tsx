@@ -34,8 +34,13 @@ export default async function HomePage() {
   }
 
   // Using Algeria coordinates as default (36.7538, 3.0588)
+  // NOTE: This is just for initial render. The real location will be fetched client-side
+  // from the user's device via geolocation API in the PharmacyMap component
   const userLatitude = profile.latitude || 36.7538
   const userLongitude = profile.longitude || 3.0588
+  
+  // Get pharmacies without distances first - distances will be calculated client-side
+  // with the user's real location
   const pharmacies = await fetchPharmaciesWithLocation(userLatitude, userLongitude)
 
   // Check for selected pharmacy from URL query (server-side)

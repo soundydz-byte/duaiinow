@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,11 @@ import { AdminAuthCheck } from "@/components/admin/admin-auth-check"
 import { PrescriptionImage } from "./prescription-image"
 
 export default async function AdminPrescriptionsPage() {
-  const supabase = await createClient()
+  // Use SERVICE ROLE key to bypass RLS policies
+  const supabase = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
 
   // Get all prescriptions
   const { data: prescriptions } = await supabase
