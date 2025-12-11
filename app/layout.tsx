@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from "@/components/theme-provider"
 import { PWARegister } from "@/components/pwa-register"
+import { PermissionsRequest } from "@/components/permissions-request"
 import "./globals.css"
 
 const cairo = Cairo({
@@ -46,6 +47,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <PermissionsRequest />
           <PWARegister />
           {children}
           <Toaster />

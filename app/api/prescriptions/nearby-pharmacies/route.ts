@@ -1,7 +1,7 @@
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 
 export async function POST(request: Request) {
-  const { prescriptionId, userLatitude, userLongitude } = await request.json()
+  const { prescriptionId, userLatitude, userLongitude, maxDistance, minDistance } = await request.json()
 
   if (!prescriptionId || !userLatitude || !userLongitude) {
     return Response.json(
@@ -9,6 +9,10 @@ export async function POST(request: Request) {
       { status: 400 }
     )
   }
+
+  // التأكد من أن المسافات ضمن النطاق الصحيح (0-200 كم)
+  const MIN_DISTANCE = Math.max(0, minDistance || 0)
+  const MAX_DISTANCE = Math.max(30, Math.min(maxDistance || 30, 200))
 
   const supabase = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,20 +43,35 @@ export async function POST(request: Request) {
 
     if (pharmaciesError) throw pharmaciesError
 
-    // Filter pharmacies within 50km
-    const nearbyPharmacies = pharmacies
-      .map((p: any) => ({
-        ...p,
-        distance: calculateDistance(userLatitude, userLongitude, p.latitude, p.longitude),
-      }))
-      .filter((p: any) => p.distance <= 50)
+    // Map all pharmacies with distances
+    const allPharmaciesWithDistance = pharmacies.map((p: any) => ({
+      ...p,
+      distance: calculateDistance(userLatitude, userLongitude, p.latitude, p.longitude),
+    }))
+
+    // Filter pharmacies within the specified range
+    let nearbyPharmacies = allPharmaciesWithDistance
+      .filter((p: any) => p.distance >= MIN_DISTANCE && p.distance <= MAX_DISTANCE)
       .sort((a: any, b: any) => a.distance - b.distance)
 
-    console.log(`✅ Found ${nearbyPharmacies.length} pharmacies within 50km`)
+    // If no pharmacies found in the range, auto-expand (fallback) up to 200km
+    let isAutoExpanded = false
+    if (nearbyPharmacies.length === 0 && MAX_DISTANCE < 200) {
+      console.log(`⚠️ No pharmacies found in range ${MIN_DISTANCE}-${MAX_DISTANCE}km, auto-expanding to 200km`)
+      nearbyPharmacies = allPharmaciesWithDistance
+        .filter((p: any) => p.distance >= MIN_DISTANCE && p.distance <= 200)
+        .sort((a: any, b: any) => a.distance - b.distance)
+      isAutoExpanded = true
+    }
+
+    console.log(`✅ Found ${nearbyPharmacies.length} pharmacies within ${MIN_DISTANCE}-${MAX_DISTANCE}km${isAutoExpanded ? ' (auto-expanded)' : ''}`)
 
     return Response.json({
       prescriptionId,
       totalPharmacies: nearbyPharmacies.length,
+      minDistance: MIN_DISTANCE,
+      maxDistance: MAX_DISTANCE,
+      isAutoExpanded, // إخبار الواجهة الأمامية بأن البحث تم توسيعه تلقائياً
       pharmacies: nearbyPharmacies.map((p: any) => ({
         id: p.id,
         name: p.pharmacy_name,

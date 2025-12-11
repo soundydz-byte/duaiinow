@@ -53,6 +53,8 @@ export function PharmacyMap({ pharmacies: initialPharmacies }: { pharmacies: Pha
   const [filterStatus, setFilterStatus] = useState<"الكل" | "مفتوح" | "مغلق">("الكل")
   const [sortBy, setSortBy] = useState<"distance" | "rating">("distance")
   const [isLoadingRealDistances, setIsLoadingRealDistances] = useState(false)
+  const [minDistance, setMinDistance] = useState<number>(0) // الحد الأدنى (0 كم)
+  const [maxDistance, setMaxDistance] = useState<number>(50) // الحد الأقصى (50 كم افتراضياً)
 
   // Fetch pharmacies with real user location when component mounts
   useEffect(() => {
@@ -151,6 +153,12 @@ export function PharmacyMap({ pharmacies: initialPharmacies }: { pharmacies: Pha
       filtered = filtered.filter((p) => p.status === filterStatus)
     }
 
+    // Apply distance filter
+    filtered = filtered.filter((p) => {
+      const dist = p.distance || 0
+      return dist >= minDistance && dist <= maxDistance
+    })
+
     // Apply sorting
     filtered.sort((a, b) => {
       if (sortBy === "distance") {
@@ -160,7 +168,7 @@ export function PharmacyMap({ pharmacies: initialPharmacies }: { pharmacies: Pha
     })
 
     setFilteredPharmacies(filtered)
-  }, [pharmacies, searchQuery, filterStatus, sortBy])
+  }, [pharmacies, searchQuery, filterStatus, sortBy, minDistance, maxDistance])
 
   return (
     <div className="space-y-4">
@@ -195,13 +203,15 @@ export function PharmacyMap({ pharmacies: initialPharmacies }: { pharmacies: Pha
           >
             {sortBy === "distance" ? "حسب المسافة" : "حسب التقييم"}
           </Button>
-          {(searchQuery || filterStatus !== "الكل") && (
+          {(searchQuery || filterStatus !== "الكل" || minDistance !== 0 || maxDistance !== 50) && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 setSearchQuery("")
                 setFilterStatus("الكل")
+                setMinDistance(0)
+                setMaxDistance(50)
               }}
               className="text-red-600 hover:bg-red-50 rounded-lg gap-1"
             >
@@ -213,23 +223,80 @@ export function PharmacyMap({ pharmacies: initialPharmacies }: { pharmacies: Pha
 
         {/* Filter options */}
         {showFilters && (
-          <Card className="p-3 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-xl space-y-2">
-            <p className="text-sm font-semibold text-emerald-900">حالة الصيدلية:</p>
-            <div className="flex gap-2">
-              {(["الكل", "مفتوح", "مغلق"] as const).map((status) => (
-                <Button
-                  key={status}
-                  size="sm"
-                  onClick={() => setFilterStatus(status)}
-                  className={`rounded-lg text-xs font-semibold ${
-                    filterStatus === status
-                      ? "bg-emerald-500 text-white"
-                      : "bg-white border-2 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                  }`}
-                >
-                  {status}
-                </Button>
-              ))}
+          <Card className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-xl space-y-4">
+            {/* Distance filter */}
+            <div>
+              <p className="text-sm font-semibold text-emerald-900 mb-3">🎯 نطاق البحث:</p>
+              <div className="space-y-3">
+                {/* Min Distance */}
+                <div>
+                  <label className="text-xs text-emerald-700 font-semibold">الحد الأدنى:</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="0"
+                      max={Math.max(200, maxDistance)}
+                      step="5"
+                      value={minDistance}
+                      onChange={(e) => {
+                        const newMin = Number(e.target.value)
+                        if (newMin <= maxDistance) setMinDistance(newMin)
+                      }}
+                      className="flex-1 h-2 bg-emerald-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    />
+                    <span className="text-sm font-bold text-emerald-700 bg-white px-2 py-1 rounded min-w-max">
+                      {minDistance} كم
+                    </span>
+                  </div>
+                </div>
+
+                {/* Max Distance */}
+                <div>
+                  <label className="text-xs text-emerald-700 font-semibold">الحد الأقصى:</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={minDistance}
+                      max="200"
+                      step="10"
+                      value={maxDistance}
+                      onChange={(e) => setMaxDistance(Number(e.target.value))}
+                      className="flex-1 h-2 bg-emerald-300 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                    />
+                    <span className="text-sm font-bold text-emerald-700 bg-white px-2 py-1 rounded min-w-max border-2 border-emerald-400">
+                      {maxDistance} كم
+                    </span>
+                  </div>
+                </div>
+
+                {/* Range Display */}
+                <div className="bg-white rounded-lg p-2 border-2 border-emerald-200">
+                  <p className="text-xs text-center text-emerald-600">
+                    🔍 البحث عن صيدليات بين <span className="font-bold">{minDistance}</span> و <span className="font-bold">{maxDistance}</span> كم
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Status filter */}
+            <div>
+              <p className="text-sm font-semibold text-emerald-900 mb-2">حالة الصيدلية:</p>
+              <div className="flex gap-2">
+                {(["الكل", "مفتوح", "مغلق"] as const).map((status) => (
+                  <Button
+                    key={status}
+                    size="sm"
+                    onClick={() => setFilterStatus(status)}
+                    className={`rounded-lg text-xs font-semibold ${
+                      filterStatus === status
+                        ? "bg-emerald-500 text-white"
+                        : "bg-white border-2 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                    }`}
+                  >
+                    {status}
+                  </Button>
+                ))}
+              </div>
             </div>
           </Card>
         )}

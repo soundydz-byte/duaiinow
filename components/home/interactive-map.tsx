@@ -58,6 +58,7 @@ export default function InteractiveMap({ pharmacies, selectedPharmacy, onSelectP
   const userMarkerRef = useRef<L.CircleMarker | null>(null)
   const routeLayerRef = useRef<L.Polyline | null>(null)
   const [currentZoom, setCurrentZoom] = useState<number>(13)
+  const infoControlRef = useRef<L.Control | null>(null)
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -98,6 +99,24 @@ export default function InteractiveMap({ pharmacies, selectedPharmacy, onSelectP
         const zoom = mapRef.current!.getZoom()
         setCurrentZoom(zoom)
       })
+
+      // Add custom info control to show filter information
+      const infoControl = L.Control.extend({
+        onAdd: function() {
+          const div = L.DomUtil.create('div', 'leaflet-control leaflet-bar')
+          div.style.backgroundColor = 'white'
+          div.style.padding = '10px'
+          div.style.borderRadius = '8px'
+          div.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'
+          div.innerHTML = `
+            <div style="font-size: 12px; color: #374151; font-weight: bold; white-space: nowrap;">
+              📍 صيدليات: ${pharmacies.length}
+            </div>
+          `
+          return div
+        }
+      })
+      new infoControl({ position: 'topright' }).addTo(mapRef.current)
 
       userMarkerRef.current = L.circleMarker(userLocation, {
         radius: 12,

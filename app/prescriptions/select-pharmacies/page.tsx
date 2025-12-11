@@ -30,6 +30,9 @@ function SelectPharmaciesContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null)
+  const [minDistance, setMinDistance] = useState<number>(0) // الحد الأدنى للمسافة
+  const [maxDistance, setMaxDistance] = useState<number>(30) // الحد الأقصى (يبدأ من 30 كم)
+  const [autoExpandMessage, setAutoExpandMessage] = useState<string>("") // رسالة التوسيع التلقائي
 
   useEffect(() => {
     const fetchPharmacies = async () => {
@@ -48,7 +51,7 @@ function SelectPharmaciesContent() {
 
               console.log(`📍 User location: (${latitude}, ${longitude})`)
 
-              // Fetch nearby pharmacies
+              // Fetch nearby pharmacies with dynamic maxDistance (up to 200km)
               const response = await fetch("/api/prescriptions/nearby-pharmacies", {
                 method: "POST",
                 headers: {
@@ -58,13 +61,14 @@ function SelectPharmaciesContent() {
                   prescriptionId,
                   userLatitude: latitude,
                   userLongitude: longitude,
+                  maxDistance: 200, // احصل على جميع الصيدليات حتى 200 كم
                 }),
               })
 
               if (response.ok) {
                 const data = await response.json()
                 setPharmacies(data.pharmacies)
-                console.log(`✅ Found ${data.pharmacies.length} pharmacies within 50km`)
+                console.log(`✅ Found ${data.pharmacies.length} pharmacies within 200km`)
               } else {
                 console.error("Failed to fetch pharmacies")
               }
@@ -175,7 +179,7 @@ function SelectPharmaciesContent() {
             </Button>
           </div>
           <p className="text-emerald-50 text-sm">
-            اختر الصيدليات التي تريد إرسال الوصفة إليها (أقل من 50 كم من موقعك)
+            اختر الصيدليات التي تريد إرسال الوصفة إليها (ضمن المسافة المحددة)
           </p>
           {userLocation && (
             <p className="text-emerald-50 text-xs mt-2 opacity-75">
@@ -186,65 +190,160 @@ function SelectPharmaciesContent() {
       </header>
 
       <main className="p-4 space-y-3">
+        {/* Distance filter - مثل Facebook Marketplace */}
+        <Card className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-xl">
+          <p className="text-sm font-semibold text-emerald-900 mb-4">🎯 نطاق البحث عن الصيدليات:</p>
+          <div className="space-y-4">
+            {/* Min Distance Slider */}
+            <div>
+              <label className="text-xs text-emerald-700 font-semibold">الحد الأدنى:</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="0"
+                  max={maxDistance}
+                  step="5"
+                  value={minDistance}
+                  onChange={(e) => {
+                    const newMin = Number(e.target.value)
+                    if (newMin <= maxDistance) setMinDistance(newMin)
+                  }}
+                  className="flex-1 h-2 bg-emerald-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                />
+                <span className="text-sm font-bold text-emerald-700 bg-white px-2 py-1 rounded min-w-max">
+                  {minDistance} كم
+                </span>
+              </div>
+            </div>
+
+            {/* Max Distance Slider */}
+            <div>
+              <label className="text-xs text-emerald-700 font-semibold">الحد الأقصى:</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={minDistance}
+                  max="200"
+                  step="10"
+                  value={maxDistance}
+                  onChange={(e) => setMaxDistance(Number(e.target.value))}
+                  className="flex-1 h-2 bg-emerald-300 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                />
+                <span className="text-sm font-bold text-emerald-700 bg-white px-2 py-1 rounded min-w-max border-2 border-emerald-400">
+                  {maxDistance} كم
+                </span>
+              </div>
+            </div>
+
+            {/* Range Display */}
+            <div className="bg-white rounded-lg p-2 border-2 border-emerald-200">
+              <p className="text-xs text-center text-emerald-600">
+                🔍 البحث عن صيدليات بين <span className="font-bold">{minDistance}</span> و <span className="font-bold">{maxDistance}</span> كم
+              </p>
+            </div>
+
+            {/* Auto-expand message */}
+            {autoExpandMessage && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-2">
+                <p className="text-xs text-blue-700 font-semibold">
+                  ℹ️ {autoExpandMessage}
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
+
         {pharmacies.length === 0 ? (
           <Card className="p-8 text-center border-2 border-dashed border-emerald-200">
             <MapPin className="h-12 w-12 text-emerald-300 mx-auto mb-3" />
             <h3 className="font-bold text-lg mb-2 text-emerald-900">لا توجد صيدليات قريبة</h3>
-            <p className="text-sm text-gray-600">للأسف لا توجد صيدليات مفعلة على بعد أقل من 50 كم من موقعك</p>
+            <p className="text-sm text-gray-600">للأسف لا توجد صيدليات مفعلة ضمن النطاق المحدد من موقعك</p>
           </Card>
         ) : (
           <>
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-              <p className="text-sm text-blue-900">
-                ✅ وجدنا <span className="font-bold">{pharmacies.length}</span> صيدليات قريبة من موقعك
-              </p>
-            </div>
+            {/* Filtered pharmacies count with auto-expand logic */}
+            {(() => {
+              const filteredPharmacies = pharmacies.filter(p => p.distance >= minDistance && p.distance <= maxDistance)
+              const hasPharmaciesInRange = filteredPharmacies.length > 0
+              
+              // إذا لم توجد صيدليات في النطاق المختار، اقترح التوسيع التلقائي
+              if (!hasPharmaciesInRange && maxDistance < 200) {
+                const nextDistance = Math.min(maxDistance + 30, 200)
+                const pharmaciesInNextRange = pharmacies.filter(p => p.distance >= minDistance && p.distance <= nextDistance)
+                if (pharmaciesInNextRange.length > 0) {
+                  setAutoExpandMessage(`لا توجد صيدليات في النطاق ${minDistance}-${maxDistance} كم. وجدنا ${pharmaciesInNextRange.length} صيدلية في النطاق ${minDistance}-${nextDistance} كم!`)
+                }
+              } else {
+                setAutoExpandMessage("")
+              }
 
-            <div className="space-y-2">
-              {pharmacies.map((pharmacy) => (
-                <Card
-                  key={pharmacy.id}
-                  className="cursor-pointer hover:shadow-lg transition-all border-2"
-                  onClick={() => togglePharmacy(pharmacy.id)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center ${
-                        selectedPharmacies.has(pharmacy.id)
-                          ? "bg-emerald-500 border-emerald-500"
-                          : "border-gray-300"
-                      }`}>
-                        {selectedPharmacies.has(pharmacy.id) && (
-                          <CheckCircle className="h-5 w-5 text-white" />
-                        )}
-                      </div>
+              return (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                    <p className="text-sm text-blue-900">
+                      ✅ وجدنا <span className="font-bold">{filteredPharmacies.length}</span> صيدليات في النطاق المختار
+                    </p>
+                  </div>
 
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-gray-900">{pharmacy.name}</h3>
-                        <div className="space-y-1 mt-2">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <MapPin className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-                            <span className="truncate">{pharmacy.address || "عنوان غير متوفر"}</span>
-                          </div>
-                          {pharmacy.phone && (
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <Phone className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-                              <span>{pharmacy.phone}</span>
+                  {filteredPharmacies.length > 0 ? (
+                    <div className="space-y-2">
+                      {filteredPharmacies.map((pharmacy) => (
+                        <Card
+                          key={pharmacy.id}
+                          className="cursor-pointer hover:shadow-lg transition-all border-2"
+                          onClick={() => togglePharmacy(pharmacy.id)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-4">
+                              <div className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center ${
+                                selectedPharmacies.has(pharmacy.id)
+                                  ? "bg-emerald-500 border-emerald-500"
+                                  : "border-gray-300"
+                              }`}>
+                                {selectedPharmacies.has(pharmacy.id) && (
+                                  <CheckCircle className="h-5 w-5 text-white" />
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-gray-900">{pharmacy.name}</h3>
+                                <div className="space-y-1 mt-2">
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <MapPin className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                                    <span className="truncate">{pharmacy.address || "عنوان غير متوفر"}</span>
+                                  </div>
+                                  {pharmacy.phone && (
+                                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                                      <Phone className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                                      <span>{pharmacy.phone}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex-shrink-0 text-right">
+                                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold">
+                                  {pharmacy.distance} كم
+                                </Badge>
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex-shrink-0 text-right">
-                        <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold">
-                          {pharmacy.distance} كم
-                        </Badge>
-                      </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  ) : (
+                    <Card className="p-6 border-2 border-dashed border-yellow-300 bg-yellow-50">
+                      <p className="text-sm text-yellow-800 text-center font-semibold">
+                        📍 لا توجد صيدليات في النطاق {minDistance}-{maxDistance} كم
+                      </p>
+                      <p className="text-xs text-yellow-700 text-center mt-2">
+                        حاول زيادة الحد الأقصى للمسافة
+                      </p>
+                    </Card>
+                  )}
+                </>
+              )
+            })()}
 
             <div className="fixed bottom-20 left-4 right-4">
               <Button

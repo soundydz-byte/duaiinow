@@ -8,10 +8,25 @@ import { Building2, MapPin, FileText, CheckCircle, X, ArrowRight, Sparkles } fro
 import Link from "next/link"
 import { AdminAuthCheck } from "@/components/admin/admin-auth-check"
 import { useToast } from "@/hooks/use-toast"
+import { SearchFilter } from "@/components/admin/search-filter"
+
+interface Pharmacy {
+  id: string
+  pharmacy_name: string
+  city?: string
+  address?: string
+  is_verified: boolean
+  created_at: string
+  profile?: any
+  license_number?: string
+}
 
 export default function AdminPharmaciesPage() {
-  const [pharmacies, setPharmacies] = useState<any[]>([])
+  const [pharmacies, setPharmacies] = useState<Pharmacy[]>([])
+  const [filteredPharmacies, setFilteredPharmacies] = useState<Pharmacy[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [filters, setFilters] = useState<Record<string, string>>({})
   const { toast } = useToast()
 
   useEffect(() => {
@@ -19,19 +34,68 @@ export default function AdminPharmaciesPage() {
   }, [])
 
   const fetchPharmacies = async () => {
-    const response = await fetch("/api/admin/pharmacies", {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
+    try {
+      const response = await fetch("/api/admin/pharmacies", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
 
-    if (response.ok) {
-      const data = await response.json()
-      setPharmacies(data)
+      if (response.ok) {
+        const data = await response.json()
+        setPharmacies(data)
+        setFilteredPharmacies(data)
+      }
+    } catch (error) {
+      console.error("Error fetching pharmacies:", error)
     }
 
     setLoading(false)
+  }
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query)
+    applyFilters(query, filters)
+  }
+
+  const handleFilterChange = (newFilters: Record<string, string>) => {
+    setFilters(newFilters)
+    applyFilters(searchQuery, newFilters)
+  }
+
+  const applyFilters = (query: string, currentFilters: Record<string, string>) => {
+    let result = pharmacies
+
+    // Search filter
+    if (query) {
+      const lowerQuery = query.toLowerCase()
+      result = result.filter(
+        (pharmacy) =>
+          pharmacy.pharmacy_name.toLowerCase().includes(lowerQuery) ||
+          (pharmacy.address && pharmacy.address.toLowerCase().includes(lowerQuery))
+      )
+    }
+
+    // Verification filter
+    if (currentFilters.status) {
+      if (currentFilters.status === "verified") {
+        result = result.filter(p => p.is_verified)
+      } else if (currentFilters.status === "pending") {
+        result = result.filter(p => !p.is_verified)
+      }
+    }
+
+    // Sort
+    if (currentFilters.sort) {
+      if (currentFilters.sort === "newest") {
+        result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      } else if (currentFilters.sort === "oldest") {
+        result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      }
+    }
+
+    setFilteredPharmacies(result)
   }
 
   const approvePharmacy = async (pharmacyId: string) => {
@@ -50,6 +114,9 @@ export default function AdminPharmaciesPage() {
 
       // Update local state
       setPharmacies(prev => prev.map(p =>
+        p.id === pharmacyId ? { ...p, is_verified: true } : p
+      ))
+      setFilteredPharmacies(prev => prev.map(p =>
         p.id === pharmacyId ? { ...p, is_verified: true } : p
       ))
 
@@ -82,6 +149,7 @@ export default function AdminPharmaciesPage() {
 
       // Remove from local state
       setPharmacies(prev => prev.filter(p => p.id !== pharmacyId))
+      setFilteredPharmacies(prev => prev.filter(p => p.id !== pharmacyId))
 
       toast({
         title: "تم الرفض",
@@ -125,14 +193,43 @@ export default function AdminPharmaciesPage() {
         </div>
       </header>
 
-      <main className="p-6">
+      <main className="p-6 space-y-6">
+        {/* Search and Filter */}
+        <SearchFilter
+          placeholder="ابحث عن صيدلية باسمها أو المدينة..."
+          onSearch={handleSearch}
+          onFilterChange={handleFilterChange}
+          filterOptions={[
+            {
+              label: "حالة التفعيل",
+              key: "status",
+              options: [
+                { label: "مفعل", value: "verified" },
+                { label: "قيد المراجعة", value: "pending" },
+              ],
+            },
+          ]}
+          sortOptions={[
+            { label: "الأحدث أولاً", value: "newest" },
+            { label: "الأقدم أولاً", value: "oldest" },
+          ]}
+          onSortChange={(sortBy) => {
+            const newFilters = { ...filters, sort: sortBy }
+            setFilters(newFilters)
+            applyFilters(searchQuery, newFilters)
+          }}
+        />
+
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
           </div>
-        ) : pharmacies && pharmacies.length > 0 ? (
+        ) : filteredPharmacies && filteredPharmacies.length > 0 ? (
           <div className="space-y-4">
-            {pharmacies.map((pharmacy: any) => (
+            <div className="text-sm text-gray-600 font-medium">
+              عدد النتائج: <span className="text-purple-600 font-bold">{filteredPharmacies.length}</span>
+            </div>
+            {filteredPharmacies.map((pharmacy) => (
               <Card
                 key={pharmacy.id}
                 className={`overflow-hidden border-2 shadow-lg rounded-2xl hover:shadow-xl transition-all duration-300 cute-card ${
